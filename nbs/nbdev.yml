@@ -1,0 +1,9 @@
+project:
+  output-dir: _docs
+
+website:
+  title: "keybindings_fps"
+  site-url: "https://Hopsakee.github.io/keybindings_fps"
+  description: "Web app to store keybindings for fps games"
+  repo-branch: main
+  repo-url: "https://github.com/Hopsakee/keybindings_fps"
