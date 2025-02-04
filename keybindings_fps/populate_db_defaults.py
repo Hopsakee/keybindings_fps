@@ -143,3 +143,7 @@ def setup_fresh_db():
     populate_actions(db)
     create_default_game(db)
     return db
+
+# %% ../nbs/02_populate_db_defaults.ipynb 11
+#db = setup_fresh_db()
+#db.t.categories()

@@ -32,7 +32,9 @@ def init_db(data_dir=None):
 
 # %% ../nbs/00_create_db.ipynb 8
 def create_tables(db):
-    """Create all required database tables"""
+    """Create all required database tables.
+    WARNING: This will drop existing tables!
+    """
     tables = ['categories', 'actions', 'games', 'game_keys', 'modifiers', 'bindings']
     
     # Drop tables if they exist
