@@ -9,20 +9,22 @@ app, rt = fast_app(hdrs=Theme.blue.headers(), default_hdrs=True, live=True)
 db = init_db()
 
 # Header with navigation
-nav = NavBarContainer(
-    NavBarLSide(
-        NavBarNav(
-            Li(A("Games", href="/"))
-        )
-    ),
-    NavBarRSide(
-        NavBarNav(
-            Li(A("Add Game", href="/add_game")),
-            Li(A("Add new action", href="/add_action")),
-            Li(A("Settings", href="/settings")),
+def nav():
+    nav = NavBarContainer(
+        NavBarLSide(
+            NavBarNav(
+                Li(A("Games", href="/"))
+            )
+        ),
+        NavBarRSide(
+            NavBarNav(
+                Li(A("Add Game", href="/add_game")),
+                Li(A("Add new action", href="/add_action")),
+                Li(A("Settings", href="/settings")),
+            )
         )
     )
-)
+    return nav
 
 def ex_theme_switcher():
     from fasthtml.components import Uk_theme_switcher
@@ -95,6 +97,11 @@ def create_bindings_table_print(bindings, game_id):
 
     game = db.t.games[game_id]
     differences = compare_with_default(game['name'])
+
+    def non_tap_modifier(modifier):
+        if modifier != "tap":
+            return f"   ({modifier})"
+        return ""
     
     # Group bindings by category
     grouped_bindings = {}
@@ -122,9 +129,8 @@ def create_bindings_table_print(bindings, game_id):
 
             rows.append(Tr(
                 Td(actions[b['action_id']][0]),
-                Td(next(db.t.game_keys.rows_where("id = ?", [b['key_id']]))['name'],
-                   cls=text_style),
-                Td(next(db.t.modifiers.rows_where("id = ?", [b['modifier_id']]))['name'],
+                Td(next(db.t.game_keys.rows_where("id = ?", [b['key_id']]))['name'], 
+                   P(non_tap_modifier(next(db.t.modifiers.rows_where("id = ?", [b['modifier_id']]))['name']), cls=TextT.italic),
                    cls=text_style),
             ))
     
@@ -213,7 +219,7 @@ def get():
         ), href=f"/game/{game['id']}") for game in games]
     )
     
-    return Container(nav, game_grid)
+    return Container(nav(), game_grid)
 
 @rt('/add_game')
 def get():
@@ -225,27 +231,26 @@ def get():
         LabelInput("Image URL", id="image_url"),
         Button("Add Game", cls=ButtonT.primary),
         hx_post="/add_game",
-        hx_target="#result"
+        hx_target="#result",
+        hx_swap="innerHTML"
     )
     
     return Container(
-        nav,  # Reuse the navigation
+        nav(),
         form,
-        Div(id="result")  # For showing result/errors
+        P("Wacht op input",id="result")  # For showing result/errors
     )
 
 @rt('/settings')
 def get():
-    return Container(nav, ex_theme_switcher())
+    return Container(nav(), ex_theme_switcher())
 
 @rt('/add_game')
 def post(name: str, game_type: str, image_url: str = None):
     try:
         game = upsert_game(name, game_type, image_url)
         copy_default_bindings(name)
-        return Div("Game added successfully with default bindings!", 
-                  A("View Games", href="/"), 
-                  cls=AlertT.success)
+        return "Game added successfully with default bindings!"
     except Exception as e:
         return Div(f"Error: {str(e)}", cls=AlertT.error)
 
@@ -285,19 +290,35 @@ def get(id: int):
 def get(id: int):
     game = db.t.games[id]
     bindings = db.t.bindings.rows_where("game_id = ?", [id])
-    
-    return Titled(H3(f"Key Bindings - {game['name']}", href="/"),
-        NavBarNavContainer(
-            NavBarRSide(
-                NavBarNav(
-                    Li(A("Back to Games",
-                        href="/",
-                        cls=(ButtonT.secondary, PaddingT.xs))),
-                ),
-            ),
+
+    nav = NavBarContainer(
+        NavBarLSide(
+            NavBarNav(
+                Li(A("Games", href="/"))
+            )
         ),
-        Div(create_bindings_table_print(bindings, id), id="bindings-table_print"),
+        NavBarRSide(
+            A(H4(game['name']), href=f"/game/{id}"),
+            )
         )
+
+    return Container(
+        nav,
+        create_bindings_table_print(bindings, id)
+    )
+    
+    # return Titled(H3(f"Key Bindings - {game['name']}", href="/"),
+    #     NavBarNavContainer(
+    #         NavBarRSide(
+    #             NavBarNav(
+    #                 Li(A("Back to Games",
+    #                     href="/",
+    #                     cls=(ButtonT.secondary, PaddingT.xs))),
+    #             ),
+    #         ),
+    #     ),
+    #     Div(create_bindings_table_print(bindings, id), id="bindings-table_print"),
+    #     )
 
 @rt('/binding/{id}/update')
 def post(id: int, key_id: int, modifier_id: int):
