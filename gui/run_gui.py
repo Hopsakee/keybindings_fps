@@ -79,8 +79,10 @@ def create_bindings_table(bindings, game_id):
                    cls=text_style),
                 Td(b['description'],
                    cls=text_style),
-                Td(Div(Button("Edit", cls=ButtonT.secondary, uk_toggle="target: #modal-container"),
-                        Modal(P(f"Edit binding {b_id}"), footer=ModalCloseButton("Close"), id="modal-container")),
+                Td(Button("Edit", 
+                        hx_get=f"/binding/{b_id}/edit",
+                        hx_target="#bindings-table",
+                        cls=ButtonT.secondary),
                    Button("Delete", 
                         hx_delete=f"/binding/{b['id']}/delete",
                         hx_target="#bindings-table",
@@ -147,73 +149,60 @@ def create_bindings_table_print(bindings, game_id):
         Table(*create_bindings_per_category(grouped_bindings['menu'], 'menu', actions))), 
         cols=3, cls='gap-12'))
 
-def create_edit_modal(id: int):
+def create_edit_screen(id: int):
     print(f"Editing binding {id}")
     binding = next(db.t.bindings.rows_where("id = ?", [id]))
-    print(binding)
     default_binding = next(db.t.bindings.rows_where(
         "game_id = ? AND action_id = ?", 
         [1, binding['action_id']] # game_id is always 1 for default
     ))
-    print(default_binding)
 
     action = next(db.t.actions.rows_where("id = ?", [binding['action_id']]))
-    print(f"action: {action['name']}")
 
     keys = db.t.game_keys()
     modifiers = db.t.modifiers()
 
     key_idx = next(i for i, k in enumerate(keys) if k['id']==binding['key_id'])
     mod_idx = next(i for i, k in enumerate(modifiers) if k['id']==binding['modifier_id'])
-    print(f"key_idx: {key_idx}, mod_idx: {mod_idx}")
 
     default_key = next(db.t.game_keys.rows_where("id = ?", [default_binding['key_id']]))
     default_mod = next(db.t.modifiers.rows_where("id = ?", [default_binding['modifier_id']]))
-    print(f"Default key: {default_key['name']}, mod: {default_mod['name']}")
     
     return Div(
-        ModalHeader(
-            ModalTitle(action['name'])
-        ),
-        Form(
-            ModalBody(
-                Grid(
-                    Div(  # Left column - edit controls
-                        LabelSelect(
-                            *[Option(k['name'], value=k['id']) for k in keys],
-                            name="key_id",
-                            label="Key",
-                            # selected_idx=key_idx
-                        ),
-                        LabelSelect(
-                            *[Option(m['name'], value=m['id']) for m in modifiers],
-                            name="modifier_id",
-                            label="Modifier",
-                            # selected_idx=mod_idx
-                        ),
-                        LabelInput("Descriptio of action for game", id="description")
+        DivCentered(
+            H3(f"Edit Binding {action['name']}", cls=TextT.lg)),
+        Form(Grid(
+                Div(  # Left column - edit controls
+                    LabelSelect(
+                        *[Option(k['name'], value=k['id']) for k in keys],
+                        name="key_id",
+                        label="Key",
+                        # selected_idx=key_idx
                     ),
-                    Div(  # Right column - default values
-                        H3("Default Values", cls=TextT.muted),
-                        P(f"Key: {default_key['name']}", cls=TextT.muted),
-                        P(f"Modifier: {default_mod['name']}", cls=TextT.muted),
-                        cls="uk-text-right"
+                    LabelSelect(
+                        *[Option(m['name'], value=m['id']) for m in modifiers],
+                        name="modifier_id",
+                        label="Modifier",
+                        # selected_idx=mod_idx
                     ),
-                    cls="grid-cols-2 gap-4"
-                )
+                    LabelInput("Descriptio of action for game", id="description")
+                ),
+                Div(  # Right column - default values
+                    H3("Default Values", cls=TextT.muted),
+                    P(f"Key: {default_key['name']}", cls=TextT.muted),
+                    P(f"Modifier: {default_mod['name']}", cls=TextT.muted),
+                    cls="uk-text-right"
+                ),
+                cls="grid-cols-2 gap-4"
             ),
-            ModalFooter(
-                ModalCloseButton("Cancel", cls=ButtonT.secondary),
-                Button("Save", 
-                    type="submit",
-                    cls=ButtonT.primary,
-                    hx_post=f"/binding/{id}/update",
-                    hx_target="#bindings-table",
-                    uk_toggle="target: #edit-modal")  # Close modal after save
+            Button("Save", 
+                type="submit",
+                cls=ButtonT.primary,
+                hx_post=f"/binding/{id}/update",
+                hx_target="#bindings-table",
+                uk_toggle="target: #edit-modal")  # Close modal after save
             ),
-        ),
-        cls="uk-modal-dialog"
-    )
+        )
 
 @rt('/')
 def get():
@@ -234,9 +223,9 @@ def get():
                 P(f"Type: {game['game_type']}", cls=(TextT.muted))
             ),
             cls=CardT.hover  # Makes whole card clickable
-        ), href=f"/game/{game['id']}") for game in games]
+        ), href=f"/game/{game['id']}") for game in games],
+        id="games-grid"
     )
-
  
     return Container(nav(), game_grid)
 
@@ -334,32 +323,31 @@ def get(id: int):
     game = db.t.games[id]
     bindings = db.t.bindings.rows_where("game_id = ?", [id])
     
-    return Titled(
+    return Div(nav(), Titled(
         f"Key Bindings - {game['name']}",
         Container(
             DivRAligned(
-                A("Back to Games",
-                    href="/",
-                    cls=(ButtonT.secondary, PaddingT.xl)),
+                Button("Back to Games",
+                    hx_get="/",
+                    hx_target="#game-page",
+                    hx_swap="outer-html",
+                    cls=(ButtonT.secondary, PaddingT.xl, 'mb-4')),
                 Button("Copy Default Bindings", 
                     hx_post=f"/game/{id}/copy_defaults",
                     hx_target="#bindings-table",
-                    cls=(ButtonT.secondary, PaddingT.xl)),
+                    cls=(ButtonT.secondary, PaddingT.xl, 'mb-4')),
                 A("Add Binding", 
                     href=f"/game/{id}/add_binding",
-                    cls=(ButtonT.primary, PaddingT.xl)),
+                    cls=(ButtonT.secondary, PaddingT.xl, 'mb-4')),
                 A("Print layout",
                     href=f"/game/{id}/print_layout",
-                    cls=(ButtonT.secondary, PaddingT.xl)),
+                    cls=(ButtonT.secondary, PaddingT.xl, 'mb-4')),
                 cls="space-x-4"
             ),
             Div(create_bindings_table(bindings, id), id="bindings-table"),
-            Div(id="modal-container")
-            # ModalContainer(
-            #     ModalDialog(id="edit-modal-content"),
-            #     id="edit-modal"
-            # )
             )
+        ),
+        id="game-page"
     )
 
 @rt('/game/{id}/copy_defaults')
@@ -455,11 +443,7 @@ def get(id: int):
 @rt('/binding/{id}/edit')
 def get(id: int):
     return Div(
-        create_edit_modal(id),
-        cls="uk-modal",
-        uk_modal="true",
-        id="edit-modal",
-        tabindex="-1"
+        create_edit_screen(id),
     )
 
 @rt('/binding/{id}/update')
