@@ -53,13 +53,16 @@ def create_bindings_table(bindings, game_id):
         Th("Action"),
         Th("Key"),
         Th("Modifier"),
+        Th("Game native description"),
         Th("Actions")
     )]
+
+
     
     for category, cat_bindings in grouped_bindings.items():
-        # Add category header
+        #Add category header
         rows.append(Tr(
-            Th(P(category, colspan=4, cls=(TextT.lg, TextT.bold, TextT.primary, TextT.center)))
+            Th(P(category, cls=(TextT.lg, TextT.bold, TextT.primary, TextT.center)))
         ))
         
         # Add bindings for this category
@@ -74,35 +77,55 @@ def create_bindings_table(bindings, game_id):
                    cls=text_style),
                 Td(next(db.t.modifiers.rows_where("id = ?", [b['modifier_id']]))['name'],
                    cls=text_style),
-                Td(Button("Edit", cls=ButtonT.secondary,
-                          uk_toggle="target: #edit-modal"),
+                Td(b['description'],
+                   cls=text_style),
+                Td(Div(Button("Edit", cls=ButtonT.secondary, uk_toggle="target: #modal-container"),
+                        Modal(P(f"Edit binding {b_id}"), footer=ModalCloseButton("Close"), id="modal-container")),
                    Button("Delete", 
-                        hx_delete=f"/binding/{b['id']}",
+                        hx_delete=f"/binding/{b['id']}/delete",
+                        hx_target="#bindings-table",
                         cls=ButtonT.danger),
-                    ModalContainer(
-                        create_edit_modal(b_id),
-                        id="edit-modal"),
-                    cls="space-x-2"
-                        
+                    cls="space-x-2")
                 )
-            ))
+            )
+        
     
     return Table(*rows, cls=(TableT.hover, TableT.sm, TableT.striped))
 
 def create_bindings_table_print(bindings, game_id):
     """Helper function to create the bindings table with category grouping"""
-    # Get all categories and create lookup dicts
-    categories = {c['id']: c['name'] for c in db.t.categories()}
-    actions = {a['id']: (a['name'], a['category_id']) for a in db.t.actions()}
-
-    game = db.t.games[game_id]
-    differences = compare_with_default(game['name'])
 
     def non_tap_modifier(modifier):
         if modifier != "tap":
             return f"   ({modifier})"
         return ""
     
+    # Create table with category groups
+    def create_bindings_per_category(cat_bindings, category, actions_dict):
+        rows = []
+
+        rows.append(Tr(Th(P(category, cls=(TextT.lg, TextT.bold, TextT.primary, TextT.center)))))
+
+        for b in cat_bindings:
+            is_different = b['action_id'] in differences
+            text_style = (TextT.bold, TextT.danger) if is_different else TextT.default
+            b_id = b['id']
+
+            rows.append(Tr(
+                Td(actions_dict[b['action_id']][0], cls=text_style),
+                Td(next(db.t.game_keys.rows_where("id = ?", [b['key_id']]))['name'], 
+                P(non_tap_modifier(next(db.t.modifiers.rows_where("id = ?", [b['modifier_id']]))['name']), cls=TextT.italic),
+                cls=text_style),
+                Td(b['description'], cls=TextT.muted)
+            ))
+        return rows
+
+    # Get all categories and create lookup dicts
+    categories = {c['id']: c['name'] for c in db.t.categories()}
+    actions = {a['id']: (a['name'], a['category_id']) for a in db.t.actions()}
+
+    game = db.t.games[game_id]
+    differences = compare_with_default(game['name'])
     # Group bindings by category
     grouped_bindings = {}
     for b in bindings:
@@ -112,51 +135,43 @@ def create_bindings_table_print(bindings, game_id):
             grouped_bindings[category] = []
         grouped_bindings[category].append(b)
     
-    # Create table with category groups
-    rows = []
-    
     for category, cat_bindings in grouped_bindings.items():
-        # Add category header
-        rows.append(Tr(
-            Th(P(category, colspan=3, cls=(TextT.lg, TextT.bold, TextT.primary, TextT.center)))
-        ))
-        
-        # Add bindings for this category
-        for b in cat_bindings:
-            is_different = b['action_id'] in differences
-            text_style = (TextT.bold, TextT.danger) if is_different else TextT.default
-            b_id = b['id']
-
-            rows.append(Tr(
-                Td(actions[b['action_id']][0]),
-                Td(next(db.t.game_keys.rows_where("id = ?", [b['key_id']]))['name'], 
-                   P(non_tap_modifier(next(db.t.modifiers.rows_where("id = ?", [b['modifier_id']]))['name']), cls=TextT.italic),
-                   cls=text_style),
-            ))
+        rows = create_bindings_per_category(cat_bindings, category, actions)
     
-    split_len = len(rows)//3
-    
-    return Grid(Table(*rows[:split_len], cls=(TableT.sm, TableT.divider)), Table(*rows[split_len:2*split_len], cls=(TableT.sm, TableT.divider)), Table(*rows[2*split_len:], cls=(TableT.sm, TableT.divider)), cols=3, cls='gap-12')
+    # return Grid(Table(*rows[:split_len], cls=(TableT.sm, TableT.divider)), Table(*rows[split_len:2*split_len], cls=(TableT.sm, TableT.divider)), Table(*rows[2*split_len:], cls=(TableT.sm, TableT.divider)), cols=3, cls='gap-12')
+    return Card(Grid(
+        Card(Table(*create_bindings_per_category(grouped_bindings['movement'], 'movement', actions))), 
+        Card(Table(*create_bindings_per_category(grouped_bindings['combat'], 'combat', actions))), 
+        Card(Table(*create_bindings_per_category(grouped_bindings['interaction'], 'interaction', actions)), 
+        Table(*create_bindings_per_category(grouped_bindings['communication'], 'communication', actions)), 
+        Table(*create_bindings_per_category(grouped_bindings['menu'], 'menu', actions))), 
+        cols=3, cls='gap-12'))
 
 def create_edit_modal(id: int):
+    print(f"Editing binding {id}")
     binding = next(db.t.bindings.rows_where("id = ?", [id]))
+    print(binding)
     default_binding = next(db.t.bindings.rows_where(
         "game_id = ? AND action_id = ?", 
         [1, binding['action_id']] # game_id is always 1 for default
     ))
+    print(default_binding)
 
     action = next(db.t.actions.rows_where("id = ?", [binding['action_id']]))
+    print(f"action: {action['name']}")
 
     keys = db.t.game_keys()
     modifiers = db.t.modifiers()
 
     key_idx = next(i for i, k in enumerate(keys) if k['id']==binding['key_id'])
     mod_idx = next(i for i, k in enumerate(modifiers) if k['id']==binding['modifier_id'])
+    print(f"key_idx: {key_idx}, mod_idx: {mod_idx}")
 
     default_key = next(db.t.game_keys.rows_where("id = ?", [default_binding['key_id']]))
     default_mod = next(db.t.modifiers.rows_where("id = ?", [default_binding['modifier_id']]))
+    print(f"Default key: {default_key['name']}, mod: {default_mod['name']}")
     
-    return ModalDialog(
+    return Div(
         ModalHeader(
             ModalTitle(action['name'])
         ),
@@ -168,14 +183,15 @@ def create_edit_modal(id: int):
                             *[Option(k['name'], value=k['id']) for k in keys],
                             name="key_id",
                             label="Key",
-                            selected_idx=key_idx
+                            # selected_idx=key_idx
                         ),
                         LabelSelect(
                             *[Option(m['name'], value=m['id']) for m in modifiers],
                             name="modifier_id",
                             label="Modifier",
-                            selected_idx=mod_idx
-                        )
+                            # selected_idx=mod_idx
+                        ),
+                        LabelInput("Descriptio of action for game", id="description")
                     ),
                     Div(  # Right column - default values
                         H3("Default Values", cls=TextT.muted),
@@ -195,7 +211,9 @@ def create_edit_modal(id: int):
                     hx_target="#bindings-table",
                     uk_toggle="target: #edit-modal")  # Close modal after save
             ),
-        ))
+        ),
+        cls="uk-modal-dialog"
+    )
 
 @rt('/')
 def get():
@@ -205,9 +223,9 @@ def get():
             return Img(src=f"data:image/jpeg;base64,{b64_image}",
                        cls=(TextT.muted, TextT.italic, BackgroundT.muted))
         return Div("No image", cls=(TextT.muted, TextT.italic, BackgroundT.muted))
-
+    
     # Game grid
-    games = db.t.games.rows_where("name != ?", ["default"])  # Exclude default template
+    games = db.t.games.rows_where("name != ? ORDER BY name", ["default"])  # Exclude default template
     game_grid = Grid(
         *[A(Card(
             CardHeader(H3(game['name'])),
@@ -218,7 +236,8 @@ def get():
             cls=CardT.hover  # Makes whole card clickable
         ), href=f"/game/{game['id']}") for game in games]
     )
-    
+
+ 
     return Container(nav(), game_grid)
 
 @rt('/add_game')
@@ -241,10 +260,6 @@ def get():
         P("Wacht op input",id="result")  # For showing result/errors
     )
 
-@rt('/settings')
-def get():
-    return Container(nav(), ex_theme_switcher())
-
 @rt('/add_game')
 def post(name: str, game_type: str, image_url: str = None):
     try:
@@ -253,6 +268,66 @@ def post(name: str, game_type: str, image_url: str = None):
         return "Game added successfully with default bindings!"
     except Exception as e:
         return Div(f"Error: {str(e)}", cls=AlertT.error)
+
+@rt('/add_action')
+def get():
+    """Show page for adding a new action"""
+    # Get existing categories for the dropdown
+    categories = [c['name'] for c in db.t.categories()]
+    
+    form = Form(
+        H2("Add New Action"),
+        LabelInput("Action Name", 
+                  name="name",
+                  placeholder="Enter the name of the action (e.g., jump, crouch, reload)"),
+        LabelSelect(
+            *[Option(c) for c in categories],
+            name="category",
+            label="Categories",
+        ),
+        LabelSelect(
+            *[Option(k['name'], value=k['name']) for k in db.t.game_keys()],
+            label="Default Key",
+            name="default_keybinding",
+        ),
+        LabelSelect(
+            *[Option(m['name'], value=m['name']) for m in db.t.modifiers()],
+            label="Default Modifier",
+            name="default_modifier",
+        ),
+        Button("Add Action", cls=ButtonT.primary),
+        hx_post="/add_action",
+        hx_target="#result"
+    )
+    
+    return Titled("Add Action", Container(
+        nav,  # Reuse the navigation
+        form,
+        Div(id="result")  # For showing result/errors
+    ))
+
+@rt('/add_action')
+def post(name: str, existing_category: str = "", new_category: str = "", default_keybinding: str = "", default_modifier: str = ""):
+    """Add a new action"""
+    try:
+        # Use existing category if selected, otherwise use new category
+        category = existing_category if existing_category else new_category
+        if not category:
+            raise ValueError("Please select an existing category or create a new one")
+            
+        if not name:
+            raise ValueError("Please enter an action name")
+            
+        add_new_action(name, category, default_keybinding, default_modifier)
+        return Div("Action added successfully!", 
+                  A("Back to Home", href="/"), 
+                  cls=AlertT.success)
+    except Exception as e:
+        return Div(f"Error: {str(e)}", cls=AlertT.error)
+    
+@rt('/settings')
+def get():
+    return Container(nav(), ex_theme_switcher())
 
 @rt('/game/{id}')
 def get(id: int):
@@ -279,71 +354,13 @@ def get(id: int):
                 cls="space-x-4"
             ),
             Div(create_bindings_table(bindings, id), id="bindings-table"),
-            ModalContainer(
-                ModalDialog(id="edit-modal-content"),
-                id="edit-modal"
+            Div(id="modal-container")
+            # ModalContainer(
+            #     ModalDialog(id="edit-modal-content"),
+            #     id="edit-modal"
+            # )
             )
-        )
     )
-
-@rt('/game/{id}/print_layout')
-def get(id: int):
-    game = db.t.games[id]
-    bindings = db.t.bindings.rows_where("game_id = ?", [id])
-
-    nav = NavBarContainer(
-        NavBarLSide(
-            NavBarNav(
-                Li(A("Games", href="/"))
-            )
-        ),
-        NavBarRSide(
-            A(H4(game['name']), href=f"/game/{id}"),
-            )
-        )
-
-    return Container(
-        nav,
-        create_bindings_table_print(bindings, id)
-    )
-    
-    # return Titled(H3(f"Key Bindings - {game['name']}", href="/"),
-    #     NavBarNavContainer(
-    #         NavBarRSide(
-    #             NavBarNav(
-    #                 Li(A("Back to Games",
-    #                     href="/",
-    #                     cls=(ButtonT.secondary, PaddingT.xs))),
-    #             ),
-    #         ),
-    #     ),
-    #     Div(create_bindings_table_print(bindings, id), id="bindings-table_print"),
-    #     )
-
-@rt('/binding/{id}/update')
-def post(id: int, key_id: int, modifier_id: int):
-    # First get the current binding to get the game_id
-    current_binding = next(db.t.bindings.rows_where("id = ?", [id]))
-    game_id = current_binding['game_id']
-    
-    # Update the binding with both key and modifier
-    binding = db.t.bindings.update(dict(
-        id=id,
-        key_id=key_id,
-        modifier_id=modifier_id
-    ))
-    
-    # Get all bindings for the game and return updated table
-    bindings = db.t.bindings.rows_where("game_id = ?", [game_id])
-    return create_bindings_table(bindings, game_id)
-
-@rt('/binding/{id}/cancel')
-def get(id: int):
-    # Just return the table without changes
-    binding = next(db.t.bindings.rows_where("id = ?", [id]))
-    game_id = binding['game_id']
-    bindings = db.t.bindings.rows_where("game_id = ?", [game_id])
-    return create_bindings_table(bindings, game_id)
 
 @rt('/game/{id}/copy_defaults')
 def post(id: int):
@@ -414,60 +431,74 @@ def post(id: int, action_id: int, key_id: int, modifier_id: int):
     except Exception as e:
         return Div(f"Error: {str(e)}", cls=AlertT.error)
 
-@rt('/add_action')
-def get():
-    """Show page for adding a new action"""
-    # Get existing categories for the dropdown
-    categories = [c['name'] for c in db.t.categories()]
-    
-    form = Form(
-        H2("Add New Action"),
-        LabelInput("Action Name", 
-                  name="name",
-                  placeholder="Enter the name of the action (e.g., jump, crouch, reload)"),
-        LabelSelect(
-            *[Option(c) for c in categories],
-            name="category",
-            label="Categories",
+@rt('/game/{id}/print_layout')
+def get(id: int):
+    game = db.t.games[id]
+    bindings = db.t.bindings.rows_where("game_id = ?", [id])
+
+    nav = NavBarContainer(
+        NavBarLSide(
+            NavBarNav(
+                Li(A("Games", href="/"))
+            )
         ),
-        LabelSelect(
-            *[Option(k['name'], value=k['name']) for k in db.t.game_keys()],
-            label="Default Key",
-            name="default_keybinding",
-        ),
-        LabelSelect(
-            *[Option(m['name'], value=m['name']) for m in db.t.modifiers()],
-            label="Default Modifier",
-            name="default_modifier",
-        ),
-        Button("Add Action", cls=ButtonT.primary),
-        hx_post="/add_action",
-        hx_target="#result"
+        NavBarRSide(
+            A(H4(game['name']), href=f"/game/{id}"),
+            )
+        )
+
+    return Container(
+        nav,
+        create_bindings_table_print(bindings, id)
     )
     
-    return Titled("Add Action", Container(
-        nav,  # Reuse the navigation
-        form,
-        Div(id="result")  # For showing result/errors
-    ))
+@rt('/binding/{id}/edit')
+def get(id: int):
+    return Div(
+        create_edit_modal(id),
+        cls="uk-modal",
+        uk_modal="true",
+        id="edit-modal",
+        tabindex="-1"
+    )
 
-@rt('/add_action')
-def post(name: str, existing_category: str = "", new_category: str = "", default_keybinding: str = "", default_modifier: str = ""):
-    """Add a new action"""
-    try:
-        # Use existing category if selected, otherwise use new category
-        category = existing_category if existing_category else new_category
-        if not category:
-            raise ValueError("Please select an existing category or create a new one")
-            
-        if not name:
-            raise ValueError("Please enter an action name")
-            
-        add_new_action(name, category, default_keybinding, default_modifier)
-        return Div("Action added successfully!", 
-                  A("Back to Home", href="/"), 
-                  cls=AlertT.success)
-    except Exception as e:
-        return Div(f"Error: {str(e)}", cls=AlertT.error)
+@rt('/binding/{id}/update')
+def post(id: int, key_id: int, modifier_id: int, description: str):
+    # First get the current binding to get the game_id
+    current_binding = next(db.t.bindings.rows_where("id = ?", [id]))
+    game_id = current_binding['game_id']
     
+    # Update the binding with both key and modifier
+    binding = db.t.bindings.update(dict(
+        id=id,
+        key_id=key_id,
+        modifier_id=modifier_id,
+        description=description
+    ))
+    
+    # Get all bindings for the game and return updated table
+    bindings = db.t.bindings.rows_where("game_id = ?", [game_id])
+    return create_bindings_table(bindings, game_id)
+
+@rt('/binding/{id}/delete')
+def delete(id: int):
+    # First get the current binding to get the game_id
+    current_binding = next(db.t.bindings.rows_where("id = ?", [id]))
+    game_id = current_binding['game_id']
+    
+    # Delete the binding
+    db.t.bindings.delete_where("id = ?", [id])
+    
+    # Get all bindings for the game and return updated table
+    bindings = db.t.bindings.rows_where("game_id = ?", [game_id])
+    return create_bindings_table(bindings, game_id)
+
+@rt('/binding/{id}/cancel')
+def get(id: int):
+    # Just return the table without changes
+    binding = next(db.t.bindings.rows_where("id = ?", [id]))
+    game_id = binding['game_id']
+    bindings = db.t.bindings.rows_where("game_id = ?", [game_id])
+    return create_bindings_table(bindings, game_id)
+
 serve()
