@@ -222,7 +222,7 @@ def get():
                 image_or_placeholder(game['image']),
                 P(f"Type: {game['game_type']}", cls=(TextT.muted))
             ),
-            cls=CardT.hover  # Makes whole card clickable
+            cls=CardT.hover  # Makes whole card clickablehttp://localhost:5001/
         ), href=f"/game/{game['id']}") for game in games],
         id="games-grid"
     )
