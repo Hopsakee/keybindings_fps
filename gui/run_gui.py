@@ -5,7 +5,7 @@ from base64 import b64encode
 from keybindings_fps.create_db import init_db
 from keybindings_fps.manipulate_db import *
 
-app, rt = fast_app(hdrs=Theme.blue.headers(), default_hdrs=True, live=True)
+app, rt = fast_app(hdrs=(Theme.blue.headers(), SortableJS('.sortable')), default_hdrs=True, live=True)
 db = init_db()
 
 # Header with navigation
@@ -49,20 +49,23 @@ def create_bindings_table(bindings, game_id):
         grouped_bindings[category].append(b)
     
     # Create table with category groups
-    rows = [Tr(
+    table_heading = Tr(
+        Th("⋮⋮", style="width:10px;"),
         Th("Action"),
         Th("Key"),
         Th("Modifier"),
         Th("Game native description"),
         Th("Actions")
-    )]
+    )
 
-
+    rows = []
     
     for category, cat_bindings in grouped_bindings.items():
         #Add category header
         rows.append(Tr(
-            Th(P(category, cls=(TextT.lg, TextT.bold, TextT.primary, TextT.center)))
+            Th(P(category, cls=(TextT.lg, TextT.bold, TextT.primary, TextT.center)),
+            colspan=6,
+            cls="bg-primary-100 dark:bg-primary-900")
         ))
         
         # Add bindings for this category
@@ -72,6 +75,7 @@ def create_bindings_table(bindings, game_id):
             b_id = b['id']
 
             rows.append(Tr(
+                Td("⋮⋮", cls="drag-handle", draggable="true", style="width: 10px;"),  # Handle cell
                 Td(actions[b['action_id']][0]),
                 Td(next(db.t.game_keys.rows_where("id = ?", [b['key_id']]))['name'],
                    cls=text_style),
@@ -87,12 +91,18 @@ def create_bindings_table(bindings, game_id):
                         hx_delete=f"/binding/{b['id']}/delete",
                         hx_target="#bindings-table",
                         cls=ButtonT.danger),
-                    cls="space-x-2")
+                    cls="space-x-2"),
+                id=f"binding-{b_id}",
+                data_id=b_id
                 )
             )
         
     
-    return Table(*rows, cls=(TableT.hover, TableT.sm, TableT.striped))
+    return Table(
+        Thead(table_heading),
+        Tbody(*rows(order_by='sort_order'), id="bindings-table-body", cls='sortable', hx_post="/binding/reorder-bindings", hx_trigger="end"),
+        cls=(TableT.hover, TableT.sm, TableT.striped),
+    )
 
 def create_bindings_table_print(bindings, game_id):
     """Helper function to create the bindings table with category grouping"""
@@ -484,5 +494,17 @@ def get(id: int):
     game_id = binding['game_id']
     bindings = db.t.bindings.rows_where("game_id = ?", [game_id])
     return create_bindings_table(bindings, game_id)
+
+@rt("/binding/reorder-bindings")
+def post(id:list[int]):
+    # The new order comes in as a list of IDs in the form data
+    new_order = request.form.getlist('bindings[]')
+    
+    # Update each binding with its new position
+    for position, binding_id in enumerate(new_order):
+        db.t.bindings.update(dict(id=binding_id, sort_order=position))
+    
+    # Return the updated table
+    return create_bindings_table(db.t.bindings.rows_where("game_id = ?", [game_id]), game_id)
 
 serve()
