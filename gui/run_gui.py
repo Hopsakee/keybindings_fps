@@ -30,27 +30,20 @@ def ex_theme_switcher():
     from fasthtml.components import Uk_theme_switcher
     return Uk_theme_switcher()
 
-def create_bindings_table(bindings, game_id):
-    """Helper function to create the bindings table with category grouping"""
-    # Get all categories and create lookup dicts
-    categories = {c['id']: c['name'] for c in db.t.categories()}
-    actions = {a['id']: (a['name'], a['category_id']) for a in db.t.actions()}
+def create_binding_table_category(db, game_id, action_category_id):
+    print("Creating binding table for category", action_category_id)
+    print("Game ID:", game_id)
 
-    game = db.t.games[game_id]
-    differences = compare_with_default(game['name'])
-    
-    # Group bindings by category
-    grouped_bindings = {}
-    for b in bindings:
-        action_name, category_id = actions[b['action_id']]
-        category = categories[category_id]
-        if category not in grouped_bindings:
-            grouped_bindings[category] = []
-        grouped_bindings[category].append(b)
-    
+    """Helper function to create the bindings table for a given action category"""
+    # Get all categories and create lookup dicts
+    cat_actions = db.t.actions.rows_where("category_id = ?", [action_category_id])
+    action_ids = L(cat_actions).attrgot("id")
+
+    cat_name = L(db.t.categories.rows_where("id = ?", [action_category_id])).attrgot('name')[0]
+
     # Create table with category groups
     table_heading = Tr(
-        Th("⋮⋮", style="width:10px;"),
+        Th("  ", style="width:10px;"),
         Th("Action"),
         Th("Key"),
         Th("Modifier"),
@@ -58,51 +51,62 @@ def create_bindings_table(bindings, game_id):
         Th("Actions")
     )
 
-    rows = []
-    
-    for category, cat_bindings in grouped_bindings.items():
-        #Add category header
-        rows.append(Tr(
-            Th(P(category, cls=(TextT.lg, TextT.bold, TextT.primary, TextT.center)),
-            colspan=6,
-            cls="bg-primary-100 dark:bg-primary-900")
-        ))
-        
-        # Add bindings for this category
-        for b in cat_bindings:
-            is_different = b['action_id'] in differences
-            text_style = (TextT.bold, TextT.danger) if is_different else TextT.default
-            b_id = b['id']
+    text_style = TextT.justify
 
-            rows.append(Tr(
-                Td("⋮⋮", cls="drag-handle", draggable="true", style="width: 10px;"),  # Handle cell
-                Td(actions[b['action_id']][0]),
-                Td(next(db.t.game_keys.rows_where("id = ?", [b['key_id']]))['name'],
-                   cls=text_style),
-                Td(next(db.t.modifiers.rows_where("id = ?", [b['modifier_id']]))['name'],
-                   cls=text_style),
-                Td(b['description'],
-                   cls=text_style),
-                Td(Button("Edit", 
-                        hx_get=f"/binding/{b_id}/edit",
-                        hx_target="#bindings-table",
-                        cls=ButtonT.secondary),
-                   Button("Delete", 
-                        hx_delete=f"/binding/{b['id']}/delete",
-                        hx_target="#bindings-table",
-                        cls=ButtonT.danger),
-                    cls="space-x-2"),
-                id=f"binding-{b_id}",
-                data_id=b_id
-                )
+    rows = []
+       
+    # Add bindings for this category
+    action_ids_str = ','.join(str(id) for id in action_ids) 
+    # Convert action_ids to string. Converting to a tuple creates a trailing comma with only one element. Which gives invalid SQL syntax.
+    where_string = f"game_id = {game_id} AND action_id IN ({action_ids_str})"
+
+    for b in db.t.bindings.rows_where(where_string):
+
+        rows.append(Tr(
+            Td("⋮⋮", style="width: 10px;"),
+            Td(next(db.t.actions.rows_where("id = ?", [b['action_id']]))['name'],
+                cls=text_style),
+            Td(next(db.t.game_keys.rows_where("id = ?", [b['key_id']]))['name'],
+                cls=text_style),
+            Td(next(db.t.modifiers.rows_where("id = ?", [b['modifier_id']]))['name'],
+                cls=text_style),
+            Td(b['description'],
+                cls=text_style),
+            # Td(b['sort_order'],
+            #     cls=text_style),
+            Td(Button("Edit", 
+                    hx_get=f"/binding/{b['id']}/edit",
+                    hx_target="#bindings-table",
+                    cls=ButtonT.secondary),
+                Button("Delete", 
+                    hx_delete=f"/binding/{b['id']}/delete",
+                    hx_target="#bindings-table",
+                    cls=ButtonT.danger),
+                cls="space-x-2"),
+            data_id=b['id']
             )
-        
+        )
     
-    return Table(
-        Thead(table_heading),
-        Tbody(*rows(order_by='sort_order'), id="bindings-table-body", cls='sortable', hx_post="/binding/reorder-bindings", hx_trigger="end"),
-        cls=(TableT.hover, TableT.sm, TableT.striped),
-    )
+    return Div(P(cat_name, cls=(TextT.lg, TextT.bold, TextT.primary, TextT.center)), 
+               Table(Thead(table_heading),
+               Tbody(*rows,
+                     cls='sortable',
+                     id=f"sortable-tbody-{action_category_id}",
+                     hx_post="/reorder_bindings",
+                     hx_trigger="end"),
+               cls=(TableT.hover, TableT.sm, TableT.striped)))
+
+def create_bindings_table(db, game_id):
+    """Create tables for all action categories and stack them vertically"""
+    # Get all unique category IDs
+    categories = db.t.categories.rows_where("id IN (SELECT DISTINCT category_id FROM actions)")
+    category_ids = L(categories).attrgot('id')
+    
+    # Create a table for each category
+    tables = [create_binding_table_category(db, game_id, cat_id) for cat_id in category_ids]
+    
+    # Stack tables in a container div
+    return Div(*tables, id="all-bindings-tables")
 
 def create_bindings_table_print(bindings, game_id):
     """Helper function to create the bindings table with category grouping"""
@@ -262,8 +266,8 @@ def get():
 @rt('/add_game')
 def post(name: str, game_type: str, image_url: str = None):
     try:
-        game = upsert_game(name, game_type, image_url)
-        copy_default_bindings(name)
+        game = upsert_game(db, name, game_type, image_url)
+        copy_default_bindings(db, game['name'])
         return "Game added successfully with default bindings!"
     except Exception as e:
         return Div(f"Error: {str(e)}", cls=AlertT.error)
@@ -328,10 +332,11 @@ def post(name: str, existing_category: str = "", new_category: str = "", default
 def get():
     return Container(nav(), ex_theme_switcher())
 
-@rt('/game/{id}')
-def get(id: int):
-    game = db.t.games[id]
-    bindings = db.t.bindings.rows_where("game_id = ?", [id])
+@rt('/game/{game_id}')
+def get(game_id: int):
+
+    bindings = db.t.bindings.rows_where("game_id = ?", [game_id])
+    game = db.t.games[game_id]
     
     return Div(nav(), Titled(
         f"Key Bindings - {game['name']}",
@@ -343,36 +348,34 @@ def get(id: int):
                     hx_swap="outer-html",
                     cls=(ButtonT.secondary, PaddingT.xl, 'mb-4')),
                 Button("Copy Default Bindings", 
-                    hx_post=f"/game/{id}/copy_defaults",
+                    hx_post=f"/game/{game_id}/copy_defaults",
                     hx_target="#bindings-table",
                     cls=(ButtonT.secondary, PaddingT.xl, 'mb-4')),
                 A("Add Binding", 
-                    href=f"/game/{id}/add_binding",
+                    href=f"/game/{game_id}/add_binding",
                     cls=(ButtonT.secondary, PaddingT.xl, 'mb-4')),
                 A("Print layout",
-                    href=f"/game/{id}/print_layout",
+                    href=f"/game/{game_id}/print_layout",
                     cls=(ButtonT.secondary, PaddingT.xl, 'mb-4')),
                 cls="space-x-4"
             ),
-            Div(create_bindings_table(bindings, id), id="bindings-table"),
+            Div(create_bindings_table(db, game_id), id="bindings-table"),
             )
         ),
         id="game-page"
     )
 
-@rt('/game/{id}/copy_defaults')
-def post(id: int):
-    game = db.t.games[id]
-    copy_default_bindings(game['name'])
+@rt('/game/{game_id}/copy_defaults')
+def post(game_id: int):
+    game = db.t.games[game_id]
+    copy_default_bindings(db,game['name'])
     
-    # Return just the new table
-    bindings = db.t.bindings.rows_where("game_id = ?", [id])
-    return create_bindings_table(game_id=id, bindings=bindings)
+    return create_bindings_table(db, game_id=game_id)
 
-@rt('/game/{id}/add_binding')
-def get(id: int):
+@rt('/game/{game_id}/add_binding')
+def get(game_id: int):
     """Show page for adding a new binding"""
-    game = db.t.games[id]
+    game = db.t.games[game_id]
     actions = db.t.actions.rows
     keys = db.t.game_keys()
     modifiers = db.t.modifiers()
@@ -395,7 +398,7 @@ def get(id: int):
             label="Modifier"
         ),
         Button("Add Binding", cls=ButtonT.primary),
-        hx_post=f"/game/{id}/add_binding",
+        hx_post=f"/game/{game_id}/add_binding",
         hx_target="#result"
     )
     
@@ -403,7 +406,7 @@ def get(id: int):
         nav,  # Reuse the navigation
         DivRAligned(
             A("Back to Game", 
-              href=f"/game/{id}",
+              href=f"/game/{game_id}",
               cls=(ButtonT.secondary, PaddingT.xl)),
             cls="space-x-4"
         ),
@@ -411,28 +414,28 @@ def get(id: int):
         Div(id="result")  # For showing result/errors
     ))
 
-@rt('/game/{id}/add_binding')
-def post(id: int, action_id: int, key_id: int, modifier_id: int):
+@rt('/game/{game_id}/add_binding')
+def post(game_id: int, action_id: int, key_id: int, modifier_id: int):
     """Add a new binding"""
     try:
         # Add the binding
         db.t.bindings.insert(dict(
-            game_id=id,
+            game_id=game_id,
             action_id=action_id,
             key_id=key_id,
             modifier_id=modifier_id
         ))
         
         return Div("Binding added successfully!", 
-                  A("Back to Game", href=f"/game/{id}"), 
+                  A("Back to Game", href=f"/game/{game_id}"), 
                   cls=AlertT.success)
     except Exception as e:
         return Div(f"Error: {str(e)}", cls=AlertT.error)
 
-@rt('/game/{id}/print_layout')
-def get(id: int):
-    game = db.t.games[id]
-    bindings = db.t.bindings.rows_where("game_id = ?", [id])
+@rt('/game/{game_id}/print_layout')
+def get(game_id: int):
+    game = db.t.games[game_id]
+    bindings = db.t.bindings.rows_where("game_id = ?", [game_id])
 
     nav = NavBarContainer(
         NavBarLSide(
@@ -441,15 +444,24 @@ def get(id: int):
             )
         ),
         NavBarRSide(
-            A(H4(game['name']), href=f"/game/{id}"),
+            A(H4(game['name']), href=f"/game/{game_id}"),
             )
         )
 
     return Container(
         nav,
-        create_bindings_table_print(bindings, id)
+        create_bindings_table_print(bindings, game_id)
     )
     
+@rt("/reorder_bindings")
+def post(id: list[int]):
+    for i, id_ in enumerate(id):
+        db.t.bindings.update(
+            {'sort_order': i},
+            id_)
+    
+    return "" # Empty response since we use hx-swap="none"
+
 @rt('/binding/{id}/edit')
 def get(id: int):
     return Div(
@@ -495,16 +507,5 @@ def get(id: int):
     bindings = db.t.bindings.rows_where("game_id = ?", [game_id])
     return create_bindings_table(bindings, game_id)
 
-@rt("/binding/reorder-bindings")
-def post(id:list[int]):
-    # The new order comes in as a list of IDs in the form data
-    new_order = request.form.getlist('bindings[]')
-    
-    # Update each binding with its new position
-    for position, binding_id in enumerate(new_order):
-        db.t.bindings.update(dict(id=binding_id, sort_order=position))
-    
-    # Return the updated table
-    return create_bindings_table(db.t.bindings.rows_where("game_id = ?", [game_id]), game_id)
 
 serve()

@@ -96,41 +96,49 @@ def create_default_game(db):
         image=None
     ))
 
-    # Default bindings dictionary
+    # Default bindings dictionary with category-based sort_order
     default_bindings = {
-        'Forward': ('w', 'hold'),
-        'Backward': ('s', 'hold'),
-        'Left': ('a', 'hold'),
-        'Right': ('d', 'hold'),
-        'Jump/climb': ('left_control', 'tap'),
-        'Crouch': ('c', 'tap'),
-        'Prone': ('space', 'tap'),
-        'Sprint': ('left_shift', 'hold'),
-        'Walk': ('left_alt', 'hold'),
-        'Lean left': ('mouse_side_front', 'hold'),
-        'Lean right': ('mouse_side_back', 'hold'),
-        'Fire primary': ('mouse_left', 'tap'),
-        'Aim': ('mouse_right', 'tap'),
-        'Reload': ('r', 'tap'),
-        'Switch weapon': ('mouse_middle', 'scroll'),
-        'Melee': ('h', 'tap'),
-        'Grenade': ('g', 'tap'),
-        'Special': ('q', 'tap'),
-        'Stim': ('f', 'tap'),
-        'Use': ('e', 'tap'),
-        'Voice': ('t', 'tap'),
-        'Text': ('enter', 'tap'),
-        'Ping': ('z', 'tap'),
-        'Emote': ('b', 'tap'),
-        'Menu': ('esc', 'tap'),
-        'Map': ('m', 'tap'),
-        'Inventory': ('tab', 'tap')
+        # Movement (100-199)
+        'Forward': ('w', 'hold', None, 100),
+        'Backward': ('s', 'hold', None, 101),
+        'Left': ('a', 'hold', None, 102),
+        'Right': ('d', 'hold', None, 103),
+        'Jump/climb': ('left_control', 'tap', None, 104),
+        'Crouch': ('c', 'tap', None, 105),
+        'Prone': ('space', 'tap', None, 106),
+        'Sprint': ('left_shift', 'hold', None, 107),
+        'Walk': ('left_alt', 'hold', None, 108),
+        'Lean left': ('mouse_side_front', 'hold', None, 109),
+        'Lean right': ('mouse_side_back', 'hold', None, 110),
+        
+        # Combat (200-299)
+        'Fire primary': ('mouse_left', 'tap', None, 200),
+        'Aim': ('mouse_right', 'tap', None, 201),
+        'Reload': ('r', 'tap', None, 202),
+        'Switch weapon': ('mouse_middle', 'scroll', None, 203),
+        'Melee': ('h', 'tap', None, 204),
+        'Grenade': ('g', 'tap', None, 205),
+        'Special': ('q', 'tap', None, 206),
+        'Stim': ('f', 'tap', None, 207),
+        
+        # Interaction (300-399)
+        'Use': ('e', 'tap', None, 300),
+        
+        # Communication (400-499)
+        'Voice': ('t', 'tap', None, 400),
+        'Text': ('enter', 'tap', None, 401),
+        'Ping': ('z', 'tap', None, 402),
+        'Emote': ('b', 'tap', None, 403),
+        
+        # Menu (500-599)
+        'Menu': ('esc', 'tap', None, 500),
+        'Map': ('m', 'tap', None, 501),
+        'Inventory': ('tab', 'tap', None, 502)
     }
 
-    # Add all default bindings
     # Add all bindings using existing add_binding function
-    for action, (key, modifier) in default_bindings.items():
-        add_binding(db, 'default', action, key, modifier)
+    for action, (key, modifier, description, sort_order) in default_bindings.items():
+        add_binding(db, 'default', action, key, modifier, description, sort_order)
 
 # %% ../nbs/02_populate_db_defaults.ipynb 9
 def setup_fresh_db():
