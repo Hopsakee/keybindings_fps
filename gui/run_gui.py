@@ -8,6 +8,8 @@ from keybindings_fps.manipulate_db import *
 app, rt = fast_app(hdrs=(Theme.blue.headers(), SortableJS('.sortable')), default_hdrs=True, live=True)
 db = init_db()
 
+print(db.conn.filename)
+
 # Header with navigation
 def nav():
     nav = NavBarContainer(
@@ -58,7 +60,7 @@ def create_binding_table_category(db, game_id, action_category_id):
     # Add bindings for this category
     action_ids_str = ','.join(str(id) for id in action_ids) 
     # Convert action_ids to string. Converting to a tuple creates a trailing comma with only one element. Which gives invalid SQL syntax.
-    where_string = f"game_id = {game_id} AND action_id IN ({action_ids_str})"
+    where_string = f"game_id = {game_id} AND action_id IN ({action_ids_str}) ORDER BY sort_order"
 
     for b in db.t.bindings.rows_where(where_string):
 
@@ -72,8 +74,6 @@ def create_binding_table_category(db, game_id, action_category_id):
                 cls=text_style),
             Td(b['description'],
                 cls=text_style),
-            # Td(b['sort_order'],
-            #     cls=text_style),
             Td(Button("Edit", 
                     hx_get=f"/binding/{b['id']}/edit",
                     hx_target="#bindings-table",
@@ -83,18 +83,25 @@ def create_binding_table_category(db, game_id, action_category_id):
                     hx_target="#bindings-table",
                     cls=ButtonT.danger),
                 cls="space-x-2"),
-            data_id=b['id']
+            Hidden(name="binding_id", value=b['id'])
             )
         )
     
-    return Div(P(cat_name, cls=(TextT.lg, TextT.bold, TextT.primary, TextT.center)), 
-               Table(Thead(table_heading),
-               Tbody(*rows,
-                     cls='sortable',
-                     id=f"sortable-tbody-{action_category_id}",
-                     hx_post="/reorder_bindings",
-                     hx_trigger="end"),
-               cls=(TableT.hover, TableT.sm, TableT.striped)))
+    return Div(
+        P(cat_name, cls=(TextT.lg, TextT.bold, TextT.primary, TextT.center)),
+        Form(
+            Table(Thead(table_heading),
+                  Tbody(*rows,
+                        cls='sortable',
+                        id=f"sortable-tbody-{action_category_id}"),
+                cls=(TableT.hover, TableT.sm, TableT.striped)
+            ),
+            hx_post=f"/game/{game_id}/reorder_bindings/{action_category_id}",
+            hx_trigger="end from:tbody",
+            hx_target=f"#form-category-{action_category_id}",
+        ),
+        id=f"form-category-{action_category_id}"
+    )
 
 def create_bindings_table(db, game_id):
     """Create tables for all action categories and stack them vertically"""
@@ -453,14 +460,14 @@ def get(game_id: int):
         create_bindings_table_print(bindings, game_id)
     )
     
-@rt("/reorder_bindings")
-def post(id: list[int]):
-    for i, id_ in enumerate(id):
+@rt("/game/{game_id}/reorder_bindings/{action_category_id}")
+def post(binding_id: list[int], action_category_id: int, game_id: int):
+    for i, binding_id_ in enumerate(binding_id):
         db.t.bindings.update(
-            {'sort_order': i},
-            id_)
+            {'sort_order': i * 100},
+            binding_id_)
     
-    return "" # Empty response since we use hx-swap="none"
+    return create_binding_table_category(db, game_id, action_category_id)
 
 @rt('/binding/{id}/edit')
 def get(id: int):

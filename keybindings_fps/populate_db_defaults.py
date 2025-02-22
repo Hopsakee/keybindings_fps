@@ -99,41 +99,41 @@ def create_default_game(db):
     # Default bindings dictionary with category-based sort_order
     default_bindings = {
         # Movement (100-199)
-        'Forward': ('w', 'hold', None, 100),
-        'Backward': ('s', 'hold', None, 101),
-        'Left': ('a', 'hold', None, 102),
-        'Right': ('d', 'hold', None, 103),
-        'Jump/climb': ('left_control', 'tap', None, 104),
-        'Crouch': ('c', 'tap', None, 105),
-        'Prone': ('space', 'tap', None, 106),
-        'Sprint': ('left_shift', 'hold', None, 107),
-        'Walk': ('left_alt', 'hold', None, 108),
-        'Lean left': ('mouse_side_front', 'hold', None, 109),
-        'Lean right': ('mouse_side_back', 'hold', None, 110),
+        'Forward': ('w', 'hold', None, 101),
+        'Backward': ('s', 'hold', None, 102),
+        'Left': ('a', 'hold', None, 103),
+        'Right': ('d', 'hold', None, 104),
+        'Jump/climb': ('left_control', 'tap', None, 105),
+        'Crouch': ('c', 'tap', None, 106),
+        'Prone': ('space', 'tap', None, 107),
+        'Sprint': ('left_shift', 'hold', None, 108),
+        'Walk': ('left_alt', 'hold', None, 109),
+        'Lean left': ('mouse_side_front', 'hold', None, 110),
+        'Lean right': ('mouse_side_back', 'hold', None, 111),
         
         # Combat (200-299)
-        'Fire primary': ('mouse_left', 'tap', None, 200),
-        'Aim': ('mouse_right', 'tap', None, 201),
-        'Reload': ('r', 'tap', None, 202),
-        'Switch weapon': ('mouse_middle', 'scroll', None, 203),
-        'Melee': ('h', 'tap', None, 204),
-        'Grenade': ('g', 'tap', None, 205),
-        'Special': ('q', 'tap', None, 206),
-        'Stim': ('f', 'tap', None, 207),
+        'Fire primary': ('mouse_left', 'tap', None, 201),
+        'Aim': ('mouse_right', 'tap', None, 202),
+        'Reload': ('r', 'tap', None, 203),
+        'Switch weapon': ('mouse_middle', 'scroll', None, 204),
+        'Melee': ('h', 'tap', None, 205),
+        'Grenade': ('g', 'tap', None, 206),
+        'Special': ('q', 'tap', None, 207),
+        'Stim': ('f', 'tap', None, 208),
         
         # Interaction (300-399)
-        'Use': ('e', 'tap', None, 300),
+        'Use': ('e', 'tap', None, 301),
         
         # Communication (400-499)
-        'Voice': ('t', 'tap', None, 400),
-        'Text': ('enter', 'tap', None, 401),
-        'Ping': ('z', 'tap', None, 402),
-        'Emote': ('b', 'tap', None, 403),
+        'Voice': ('t', 'tap', None, 401),
+        'Text': ('enter', 'tap', None, 402),
+        'Ping': ('z', 'tap', None, 403),
+        'Emote': ('b', 'tap', None, 404),
         
         # Menu (500-599)
-        'Menu': ('esc', 'tap', None, 500),
-        'Map': ('m', 'tap', None, 501),
-        'Inventory': ('tab', 'tap', None, 502)
+        'Menu': ('esc', 'tap', None, 501),
+        'Map': ('m', 'tap', None, 502),
+        'Inventory': ('tab', 'tap', None, 503)
     }
 
     # Add all bindings using existing add_binding function
