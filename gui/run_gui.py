@@ -2,35 +2,14 @@
 from fasthtml.common import *
 from monsterui.all import *
 from base64 import b64encode
-from keybindings_fps.create_db import init_db
-from keybindings_fps.manipulate_db import *
+from keybindings_fps.create_db_structure import init_db
+from keybindings_fps.manipulate_db_contents import *
+from keybindings_fps.helpers import *
 
 app, rt = fast_app(hdrs=(Theme.blue.headers(), SortableJS('.sortable')), default_hdrs=True, live=True)
 db = init_db()
 
 print(db.conn.filename)
-
-# Header with navigation
-def nav():
-    nav = NavBarContainer(
-        NavBarLSide(
-            NavBarNav(
-                Li(A("Games", href="/"))
-            )
-        ),
-        NavBarRSide(
-            NavBarNav(
-                Li(A("Add Game", href="/add_game")),
-                Li(A("Add new action", href="/add_action")),
-                Li(A("Settings", href="/settings")),
-            )
-        )
-    )
-    return nav
-
-def ex_theme_switcher():
-    from fasthtml.components import Uk_theme_switcher
-    return Uk_theme_switcher()
 
 def create_binding_table_category(db, game_id, action_category_id):
     print("Creating binding table for category", action_category_id)
@@ -238,26 +217,26 @@ def get():
     games = db.t.games.rows_where("name != ? ORDER BY name", ["default"])  # Exclude default template
     game_grid = Grid(
         *[A(Card(
-            CardHeader(H3(game['name'])),
+            CardHeader(H3(game['name']), cls="text-primary"),
             CardBody(
                 image_or_placeholder(game['image']),
                 P(f"Type: {game['game_type']}", cls=(TextT.muted))
             ),
-            cls=CardT.hover  # Makes whole card clickablehttp://localhost:5001/
+            cls=CardT.hover  # Makes whole card clickable
         ), href=f"/game/{game['id']}") for game in games],
         id="games-grid"
     )
- 
-    return Container(nav(), game_grid)
+
+    return base_layout(game_grid)
 
 @rt('/add_game')
 def get():
     form = Form(
-        H2("Add New Game"),
-        LabelInput("Game Name", id="name"),
+        H2("Add New Game", cls=("bg-primary text-primary-content", TextT.center)),
+        LabelInput("Game Name", id="name", cls="text-primary"),
         LabelSelect(*Options('tactical', 'dumb'),
-            label="Game Type", id="game_type"),
-        LabelInput("Image URL", id="image_url"),
+            label="Game Type", id="game_type", cls="text-primary"),
+        LabelInput("Image URL", id="image_url", cls="text-primary"),
         Button("Add Game", cls=ButtonT.primary),
         hx_post="/add_game",
         hx_target="#result",
@@ -286,14 +265,17 @@ def get():
     categories = [c['name'] for c in db.t.categories()]
     
     form = Form(
-        H2("Add New Action"),
+        H2("Add New Action", cls=("bg-primary text-primary-content", TextT.center)),
         LabelInput("Action Name", 
                   name="name",
-                  placeholder="Enter the name of the action (e.g., jump, crouch, reload)"),
+                  placeholder="Enter the name of the action (e.g., jump, crouch, reload)",
+                  cls="text-primary"
+                  ),
         LabelSelect(
             *[Option(c) for c in categories],
             name="category",
             label="Categories",
+            cls="text-primary"
         ),
         LabelSelect(
             *[Option(k['name'], value=k['name']) for k in db.t.game_keys()],
@@ -303,35 +285,35 @@ def get():
         LabelSelect(
             *[Option(m['name'], value=m['name']) for m in db.t.modifiers()],
             label="Default Modifier",
+            
             name="default_modifier",
         ),
         Button("Add Action", cls=ButtonT.primary),
         hx_post="/add_action",
-        hx_target="#result"
+        hx_target="#content-area"
     )
     
-    return Titled("Add Action", Container(
-        nav,  # Reuse the navigation
-        form,
-        Div(id="result")  # For showing result/errors
-    ))
+    return base_layout(form)
 
 @rt('/add_action')
-def post(name: str, existing_category: str = "", new_category: str = "", default_keybinding: str = "", default_modifier: str = ""):
+def post(name: str, category: str = "", default_keybinding: str = "", default_modifier: str = ""):
     """Add a new action"""
     try:
-        # Use existing category if selected, otherwise use new category
-        category = existing_category if existing_category else new_category
         if not category:
             raise ValueError("Please select an existing category or create a new one")
             
         if not name:
             raise ValueError("Please enter an action name")
             
-        add_new_action(name, category, default_keybinding, default_modifier)
-        return Div("Action added successfully!", 
-                  A("Back to Home", href="/"), 
-                  cls=AlertT.success)
+        add_new_action(db, name, category, default_keybinding, default_modifier)
+        return Div(
+            Div("Action added successfully!"), 
+            Button("Back to Home",
+                   hx_get="/",
+                   hx_target="#base-layout",
+                   cls=ButtonT.secondary
+            ),
+        )
     except Exception as e:
         return Div(f"Error: {str(e)}", cls=AlertT.error)
     
@@ -406,20 +388,18 @@ def get(game_id: int):
         ),
         Button("Add Binding", cls=ButtonT.primary),
         hx_post=f"/game/{game_id}/add_binding",
-        hx_target="#result"
+        hx_target="#content-area"
     )
     
-    return Titled("Add Binding", Container(
-        nav,  # Reuse the navigation
-        DivRAligned(
+    return base_layout(
+        (DivRAligned(
             A("Back to Game", 
               href=f"/game/{game_id}",
               cls=(ButtonT.secondary, PaddingT.xl)),
             cls="space-x-4"
         ),
-        form,
-        Div(id="result")  # For showing result/errors
-    ))
+        form)
+    )
 
 @rt('/game/{game_id}/add_binding')
 def post(game_id: int, action_id: int, key_id: int, modifier_id: int):
@@ -432,10 +412,12 @@ def post(game_id: int, action_id: int, key_id: int, modifier_id: int):
             key_id=key_id,
             modifier_id=modifier_id
         ))
+        print("Binding added successfully!")
         
-        return Div("Binding added successfully!", 
-                  A("Back to Game", href=f"/game/{game_id}"), 
-                  cls=AlertT.success)
+        return Div(P("Binding added successfully!"), 
+                   A("Back to Game",
+                     href=f"/game/{game_id}",
+                     cls=(ButtonT.primary, PaddingT.xl))) 
     except Exception as e:
         return Div(f"Error: {str(e)}", cls=AlertT.error)
 

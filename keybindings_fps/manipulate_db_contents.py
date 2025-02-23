@@ -10,7 +10,7 @@ from pathlib import Path
 from httpx import get as httpx_get
 from fasthtml.common import *
 
-from .create_db import *
+from .create_db_structure import *
 
 # %% ../nbs/01_manipulate_db_contents.ipynb 4
 def add_binding(db, game_name: str, action_name: str, key_name: str, modifier_name: str = 'tap', description: str = None, sort_order: int = 0):
@@ -76,7 +76,8 @@ def delete_game(db: database, # Database connection,
     return db.t.games.delete_where("name = ?", [name])
 
 # %% ../nbs/01_manipulate_db_contents.ipynb 20
-def add_new_action(action: str, # Short description of the action
+def add_new_action(db: database, # Database connection
+                   action: str, # Short description of the action
                    category: str, # Category the action belongs to
                    default_keybinding: str, # Default keybinding for the action
                    default_modifier: str # Default modifier for the action

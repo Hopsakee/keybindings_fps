@@ -117,7 +117,7 @@ def create_tables(db: database, # Database connection
     )
 
 
-# %% ../nbs/00_create_db_structure.ipynb 12
+# %% ../nbs/00_create_db_structure.ipynb 14
 def add_clmn_to_table(db, table, column, col_type, **kwargs):
     """Add a new column to an existing table"""
     if column in db.t[table].c:
@@ -125,7 +125,7 @@ def add_clmn_to_table(db, table, column, col_type, **kwargs):
     else:
         return db.t[table].add_column(column, col_type, **kwargs)
 
-# %% ../nbs/00_create_db_structure.ipynb 18
+# %% ../nbs/00_create_db_structure.ipynb 19
 def drop_clmn_from_table(db, table, column):
     """Drop a column from an existing table"""
     if column not in db.t[table].c:
