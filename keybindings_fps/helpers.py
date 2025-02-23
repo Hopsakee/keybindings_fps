@@ -29,10 +29,7 @@ def get_project_root() -> Optional[Path]:
         print(f"Error finding project root: {str(e)}")
         return None
 
-# %% ../nbs/03_helpers.ipynb 6
-test_eq(get_project_root(), Path('/home/jelle/code/keybindings_fps'))
-
-# %% ../nbs/03_helpers.ipynb 8
+# %% ../nbs/03_helpers.ipynb 7
 def nav():
     """Create a navigation bar"""
     nav = NavBarContainer(
@@ -51,12 +48,12 @@ def nav():
     )
     return nav
 
-# %% ../nbs/03_helpers.ipynb 9
+# %% ../nbs/03_helpers.ipynb 8
 def base_layout(content):
     """Base layout with navigation bar"""
     return Container(nav(), Div(content, id="content-area"), id="base-layout")
 
-# %% ../nbs/03_helpers.ipynb 10
+# %% ../nbs/03_helpers.ipynb 9
 def ex_theme_switcher():
     from fasthtml.components import Uk_theme_switcher
     return Uk_theme_switcher()
