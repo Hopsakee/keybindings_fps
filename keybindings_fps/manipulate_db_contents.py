@@ -124,7 +124,7 @@ def copy_default_bindings(db, new_game_name: str):
             'sort_order': binding['sort_order']
         }),
 
-# %% ../nbs/01_manipulate_db_contents.ipynb 27
+# %% ../nbs/01_manipulate_db_contents.ipynb 26
 def compare_with_default(db, game_name: str):
     """Compare a game's bindings with default bindings and return differences"""
     # Get both games

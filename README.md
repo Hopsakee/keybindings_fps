@@ -11,19 +11,6 @@ documentation.
 If you are new to using `nbdev` here are some useful pointers to get you
 started.
 
-### Install keybindings_fps in Development mode
-
-``` sh
-# make sure keybindings_fps package is installed in development mode
-$ pip install -e .
-
-# make changes under nbs/ directory
-# ...
-
-# compile to have changes apply to keybindings_fps
-$ nbdev_prepare
-```
-
 ## Usage
 
 ### Installation
@@ -33,18 +20,6 @@ Install latest from the GitHub
 
 ``` sh
 $ pip install git+https://github.com/Hopsakee/keybindings_fps.git
-```
-
-or from [conda](https://anaconda.org/Hopsakee/keybindings_fps)
-
-``` sh
-$ conda install -c Hopsakee keybindings_fps
-```
-
-or from [pypi](https://pypi.org/project/keybindings_fps/)
-
-``` sh
-$ pip install keybindings_fps
 ```
 
 ### Documentation
