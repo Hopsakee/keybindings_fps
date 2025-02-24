@@ -2,4 +2,4 @@ python-fasthtml
 MonsterUI
 fastcore
 httpx
-fasthtml-hf
+# fasthtml-hf
