@@ -1,5 +1,5 @@
 # gui/app.py
-from fasthtml_hf import setup_hf_backup
+# from fasthtml_hf import setup_hf_backup
 from fasthtml.common import *
 from monsterui.all import *
 from base64 import b64encode
@@ -360,6 +360,6 @@ def get(id: int):
     bindings = db.t.bindings.rows_where("game_id = ?", [game_id])
     return create_bindings_table(bindings, game_id)
 
-setup_hf_backup(app)
+# setup_hf_backup(app)
 
 serve()
