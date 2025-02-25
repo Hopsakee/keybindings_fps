@@ -32,20 +32,12 @@ def get_project_root() -> Optional[Path]:
 # %% ../nbs/03_helpers.ipynb 7
 def nav():
     """Create a navigation bar"""
-    nav = NavBarContainer(
-        NavBarLSide(
-            NavBarNav(
-                Li(A("Games", href="/", cls=("text-secondary"))),
-            )
-        ),
-        NavBarRSide(
-            NavBarNav(
-                Li(A("Add Game", href="/add_game", cls=("text-secondary"))),
-                Li(A("Add new action", href="/add_action", cls=("text-secondary"))),
-                Li(A("Settings", href="/settings", cls=("text-secondary"))),
-            )
+    nav = NavBar(
+        A("Add Game", href="/add_game"),
+        A("Add new action", href="/add_action"),
+        A("Settings", href="/settings"),
+        brand=A("Games", href="/")
         )
-    )
     return nav
 
 # %% ../nbs/03_helpers.ipynb 8
@@ -55,5 +47,4 @@ def base_layout(content):
 
 # %% ../nbs/03_helpers.ipynb 9
 def ex_theme_switcher():
-    from fasthtml.components import Uk_theme_switcher
-    return Uk_theme_switcher()
+    return ThemePicker()

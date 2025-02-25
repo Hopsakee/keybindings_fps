@@ -199,17 +199,17 @@ def get(game_id: int):
                     hx_get="/",
                     hx_target="#game-page",
                     hx_swap="outer-html",
-                    cls=(ButtonT.secondary, PaddingT.xl, 'mb-4')),
+                    cls=(ButtonT.secondary)),
                 Button("Copy Default Bindings", 
                     hx_post=f"/game/{game_id}/copy_defaults",
                     hx_target="#bindings-table",
-                    cls=(ButtonT.secondary, PaddingT.xl, 'mb-4')),
+                    cls=(ButtonT.secondary)),
                 A("Add Binding", 
                     href=f"/game/{game_id}/add_binding",
-                    cls=(ButtonT.secondary, PaddingT.xl, 'mb-4')),
+                    cls=(ButtonT.secondary, 'pl-3', 'mb-4')),
                 A("Print layout",
                     href=f"/game/{game_id}/print_layout",
-                    cls=(ButtonT.secondary, PaddingT.xl, 'mb-4')),
+                    cls=(ButtonT.secondary, 'pl-3', 'mb-4')),
                 cls="space-x-4"
             ),
             Div(create_bindings_table(db, game_id), id="bindings-table"),
@@ -259,7 +259,7 @@ def get(game_id: int):
         (DivRAligned(
             A("Back to Game", 
               href=f"/game/{game_id}",
-              cls=(ButtonT.secondary, PaddingT.xl)),
+              cls=(ButtonT.secondary, 'pl-3', 'mb-4')),
             cls="space-x-4"
         ),
         form)
@@ -281,7 +281,7 @@ def post(game_id: int, action_id: int, key_id: int, modifier_id: int):
         return Div(P("Binding added successfully!"), 
                    A("Back to Game",
                      href=f"/game/{game_id}",
-                     cls=(ButtonT.primary, PaddingT.xl))) 
+                     cls=(ButtonT.primary, 'pl-3'))) 
     except Exception as e:
         return Div(f"Error: {str(e)}", cls=AlertT.error)
 
@@ -360,6 +360,6 @@ def get(id: int):
     bindings = db.t.bindings.rows_where("game_id = ?", [game_id])
     return create_bindings_table(bindings, game_id)
 
-# setup_hf_backup(app)
+# setup_hf_backup(ap)
 
 serve()

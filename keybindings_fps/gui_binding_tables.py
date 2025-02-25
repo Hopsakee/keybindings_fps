@@ -72,7 +72,7 @@ def create_binding_table_category(db, game_id, action_category_id, print_layout=
                     Button("Delete", 
                         hx_delete=f"/binding/{b['id']}/delete",
                         hx_target=f"#form-category-{action_category_id}",
-                        cls=ButtonT.danger),
+                        cls=ButtonT.destructive),
                     cls="space-x-2"),
                 Hidden(name="binding_id", value=b['id'])
                 )
