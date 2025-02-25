@@ -8,7 +8,7 @@ from keybindings_fps.manipulate_db_contents import *
 from keybindings_fps.helpers import *
 from keybindings_fps.gui_binding_tables import *
 
-app, rt = fast_app(hdrs=(Theme.blue.headers(), SortableJS('.sortable')), default_hdrs=True, live=True)
+app, rt = fast_app(hdrs=(Theme.slate.headers(), SortableJS('.sortable')), default_hdrs=True, live=True)
 db = init_db()
 
 print(db.conn.filename)
