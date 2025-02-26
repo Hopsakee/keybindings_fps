@@ -71,9 +71,16 @@ def upsert_game(db: database, # Database connection
 
 # %% ../nbs/01_manipulate_db_contents.ipynb 6
 def delete_game(db: database, # Database connection, 
-                name: str # Name of the game to delete
+                game_id: int # Id of the game
                 ):
-    return db.t.games.delete_where("name = ?", [name])
+    # Delete all bindings for this game
+    db.t.bindings.delete_where("game_id = ?", [game_id])
+
+    # Delete the game itself
+    game_name = db.t.games[game_id]['name']
+    db.t.games.delete_where("id = ?", [game_id])
+
+    return f"Deleted game '{game_name}'"
 
 # %% ../nbs/01_manipulate_db_contents.ipynb 20
 def add_new_action(db: database, # Database connection

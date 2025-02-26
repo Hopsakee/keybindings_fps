@@ -3,6 +3,8 @@
 from fasthtml.common import *
 from monsterui.all import *
 from base64 import b64encode
+
+from monsterui.franken import Uk_select
 from keybindings_fps.create_db_structure import init_db
 from keybindings_fps.manipulate_db_contents import *
 from keybindings_fps.helpers import *
@@ -95,29 +97,37 @@ def get():
 
 @rt('/add_game')
 def get():
+    game_type_options = ['tactical', 'dumb']
+
     form = Form(
         H2("Add New Game", cls=("bg-primary text-primary-content", TextT.center)),
-        LabelInput("Game Name", id="name", cls="text-primary"),
-        LabelSelect(*Options('tactical', 'dumb'),
-            label="Game Type", id="game_type", cls="text-primary"),
-        LabelInput("Image URL", id="image_url", cls="text-primary"),
+        LabelInput(
+            "Game Name",
+            name="name",
+            cls="text-primary"
+            ),
+        Select(
+            map(Option, game_type_options),
+            label="Game Type",
+            name="game_type"),
+        LabelInput(
+            "Image URL",
+            name="image_url",
+            cls="text-primary"
+            ),
         Button("Add Game", cls=ButtonT.primary),
         hx_post="/add_game",
-        hx_target="#result",
+        hx_target="#content-area",
         hx_swap="innerHTML"
     )
     
-    return Container(
-        nav(),
-        form,
-        P("Wacht op input",id="result")  # For showing result/errors
-    )
+    return base_layout(form)
 
 @rt('/add_game')
-def post(name: str, game_type: str, image_url: str = None):
+def post(name: str, game_type: str, image_url: str = ""):
     try:
-        game = upsert_game(db, name, game_type, image_url)
-        copy_default_bindings(db, game['name'])
+        upsert_game(db, name, game_type, image_url)
+        copy_default_bindings(db, name)
         return "Game added successfully with default bindings!"
     except Exception as e:
         return Div(f"Error: {str(e)}", cls=AlertT.error)
@@ -162,6 +172,7 @@ def get():
 @rt('/add_action')
 def post(name: str, category: str = "", default_keybinding: str = "", default_modifier: str = ""):
     """Add a new action"""
+    print("Adding action", name, category, default_keybinding, default_modifier)
     try:
         if not category:
             raise ValueError("Please select an existing category or create a new one")
@@ -195,35 +206,30 @@ def get(game_id: int):
         f"Key Bindings - {game['name']}",
         Container(
             DivRAligned(
-                Button("Back to Games",
-                    hx_get="/",
-                    hx_target="#game-page",
-                    hx_swap="outer-html",
-                    cls=(ButtonT.secondary)),
                 Button("Copy Default Bindings", 
                     hx_post=f"/game/{game_id}/copy_defaults",
                     hx_target="#bindings-table",
                     cls=(ButtonT.secondary)),
-                A("Add Binding", 
-                    href=f"/game/{game_id}/add_binding",
-                    cls=(ButtonT.secondary, 'pl-3', 'mb-4')),
-                A("Print layout",
-                    href=f"/game/{game_id}/print_layout",
-                    cls=(ButtonT.secondary, 'pl-3', 'mb-4')),
-                cls="space-x-4"
+                Button("Add Binding", 
+                    hx_get=f"/game/{game_id}/add_binding",
+                    hx_target="#game-page-buttons",
+                    cls=(ButtonT.secondary)),
+                Button("Print layout",
+                    hx_get=f"/game/{game_id}/print_layout",
+                    hx_target="#game-page",
+                    cls=(ButtonT.secondary)),
+                Button("Delete game",
+                    hx_delete=f"/game/{game_id}/delete",
+                    hx_target="#game-page",
+                    cls=(ButtonT.destructive)),
+                cls="space-x-4",
+                id="game-page-buttons"
             ),
             Div(create_bindings_table(db, game_id), id="bindings-table"),
             )
         ),
         id="game-page"
     )
-
-@rt('/game/{game_id}/copy_defaults')
-def post(game_id: int):
-    game = db.t.games[game_id]
-    copy_default_bindings(db,game['name'])
-    
-    return create_bindings_table(db, game_id=game_id)
 
 @rt('/game/{game_id}/add_binding')
 def get(game_id: int):
@@ -285,20 +291,33 @@ def post(game_id: int, action_id: int, key_id: int, modifier_id: int):
     except Exception as e:
         return Div(f"Error: {str(e)}", cls=AlertT.error)
 
+@rt('/game/{game_id}/copy_defaults')
+def post(game_id: int):
+    game = db.t.games[game_id]
+    copy_default_bindings(db,game['name'])
+    
+    return create_bindings_table(db, game_id=game_id)
+
+@rt('/game/{game_id}/delete')
+def delete(game_id: int):
+    del_message = delete_game(db, game_id)
+    
+    return Container(
+        P(del_message),
+        Button(
+            "Back to Games",
+            hx_get="/",
+            cls=ButtonT.secondary
+        )
+    )
+
 @rt('/game/{game_id}/print_layout')
 def get(game_id: int):
     game = db.t.games[game_id]
     bindings = db.t.bindings.rows_where("game_id = ?", [game_id])
 
-    nav = NavBarContainer(
-        NavBarLSide(
-            NavBarNav(
-                Li(A("Games", href="/"))
-            )
-        ),
-        NavBarRSide(
-            A(H4(game['name']), href=f"/game/{game_id}"),
-            )
+    nav = NavBar(
+        brand=A(H4(game['name']), href=f"/game/{game_id}")
         )
 
     return Container(
@@ -344,13 +363,13 @@ def delete(id: int):
     # First get the current binding to get the game_id
     current_binding = next(db.t.bindings.rows_where("id = ?", [id]))
     game_id = current_binding['game_id']
+    action_id = current_binding['action_id']
+    action_category_id = next(db.t.actions.rows_where("id = ?", [action_id]))['category_id']
     
     # Delete the binding
     db.t.bindings.delete_where("id = ?", [id])
     
-    # Get all bindings for the game and return updated table
-    bindings = db.t.bindings.rows_where("game_id = ?", [game_id])
-    return create_bindings_table(db, game_id)
+    return create_binding_table_category(db, game_id, action_category_id)
 
 @rt('/binding/{id}/cancel')
 def get(id: int):
@@ -358,7 +377,7 @@ def get(id: int):
     binding = next(db.t.bindings.rows_where("id = ?", [id]))
     game_id = binding['game_id']
     bindings = db.t.bindings.rows_where("game_id = ?", [game_id])
-    return create_bindings_table(bindings, game_id)
+    return create_bindingu_table(bindings, game_id)
 
 # setup_hf_backup(ap)
 
