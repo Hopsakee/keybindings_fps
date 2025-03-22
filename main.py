@@ -18,40 +18,100 @@ print(db.conn.filename)
 def create_edit_screen(id: int):
     print(f"Editing binding {id}")
     binding = next(db.t.bindings.rows_where("id = ?", [id]))
-    default_binding = next(db.t.bindings.rows_where(
-        "game_id = ? AND action_id = ?", 
-        [1, binding['action_id']] # game_id is always 1 for default
-    ))
-
-    action = next(db.t.actions.rows_where("id = ?", [binding['action_id']]))
+    
+    # Get action with error handling
+    try:
+        action = next(db.t.actions.rows_where("id = ?", [binding['action_id']]))
+        action_name = action['name']
+    except StopIteration:
+        action_name = f"Unknown Action (ID: {binding['action_id']})"
+        print(f"Warning: Action ID {binding['action_id']} not found for binding {id}")
+    
+    # Get default binding with error handling
+    try:
+        default_binding = next(db.t.bindings.rows_where(
+            "game_id = ? AND action_id = ?", 
+            [1, binding['action_id']] # game_id is always 1 for default
+        ))
+    except StopIteration:
+        # Create a dummy default binding if none exists
+        default_binding = {'key_id': 0, 'modifier_id': 0}
+        print(f"Warning: No default binding found for action ID {binding['action_id']}")
 
     keys = db.t.game_keys()
     modifiers = db.t.modifiers()
+    
+    # If binding has a key_id that doesn't exist, mark it as invalid but still allow editing
+    has_invalid_key = True
+    has_invalid_modifier = True
+    
+    # Find key index with error handling
+    try:
+        key_idx = next(i for i, k in enumerate(keys) if k['id']==binding['key_id'])
+        has_invalid_key = False
+    except StopIteration:
+        # Key not found, set to first key as fallback
+        key_idx = 0
+        print(f"Warning: Key ID {binding['key_id']} not found for binding {id}")
+        
+    # Find modifier index with error handling
+    try:
+        mod_idx = next(i for i, k in enumerate(modifiers) if k['id']==binding['modifier_id'])
+        has_invalid_modifier = False
+    except StopIteration:
+        # Modifier not found, set to first modifier as fallback
+        mod_idx = 0
+        print(f"Warning: Modifier ID {binding['modifier_id']} not found for binding {id}")
 
-    key_idx = next(i for i, k in enumerate(keys) if k['id']==binding['key_id'])
-    mod_idx = next(i for i, k in enumerate(modifiers) if k['id']==binding['modifier_id'])
-
-    default_key = next(db.t.game_keys.rows_where("id = ?", [default_binding['key_id']]))
-    default_mod = next(db.t.modifiers.rows_where("id = ?", [default_binding['modifier_id']]))
+    # Get default key and modifier with error handling
+    try:
+        default_key = next(db.t.game_keys.rows_where("id = ?", [default_binding['key_id']]))
+    except StopIteration:
+        # Default key not found
+        default_key = {"name": "Unknown"}
+        print(f"Warning: Default key ID {default_binding['key_id']} not found")
+        
+    try:
+        default_mod = next(db.t.modifiers.rows_where("id = ?", [default_binding['modifier_id']]))
+    except StopIteration:
+        # Default modifier not found
+        default_mod = {"name": "Unknown"}
+        print(f"Warning: Default modifier ID {default_binding['modifier_id']} not found")
+        
+    # Get current description or set default
+    description = binding.get('description', '')
+    
+    # Create warning message if there are invalid values
+    warning_message = None
+    if has_invalid_key or has_invalid_modifier:
+        warning_parts = []
+        if has_invalid_key:
+            warning_parts.append(f"invalid key ID ({binding['key_id']})")
+        if has_invalid_modifier:
+            warning_parts.append(f"invalid modifier ID ({binding['modifier_id']})")
+        warning_text = " and ".join(warning_parts)
+        warning_message = Div(
+            f"⚠️ This binding has {warning_text}. Please select valid values and save to fix.",
+            cls="uk-alert uk-alert-warning"
+        )
     
     return Div(
         DivCentered(
-            H3(f"Edit Binding {action['name']}", cls=TextT.lg)),
+            H3(f"Edit Binding {action_name}", cls=TextT.lg)),
+        warning_message if warning_message else None,
         Form(Grid(
                 Div(  # Left column - edit controls
                     LabelSelect(
-                        *[Option(k['name'], value=k['id']) for k in keys],
+                        *[Option(k['name'], value=k['id'], selected=(i==key_idx)) for i, k in enumerate(keys)],
                         name="key_id",
-                        label="Key",
-                        # selected_idx=key_idx
+                        label="Key"
                     ),
                     LabelSelect(
-                        *[Option(m['name'], value=m['id']) for m in modifiers],
+                        *[Option(m['name'], value=m['id'], selected=(i==mod_idx)) for i, m in enumerate(modifiers)],
                         name="modifier_id",
-                        label="Modifier",
-                        # selected_idx=mod_idx
+                        label="Modifier"
                     ),
-                    LabelInput("Descriptio of action for game", id="description")
+                    LabelInput("Description of action for game", name="description", value=description)
                 ),
                 Div(  # Right column - default values
                     H3("Default Values", cls=TextT.muted),
@@ -275,6 +335,10 @@ def get(game_id: int):
 def post(game_id: int, action_id: int, key_id: int, modifier_id: int):
     """Add a new binding"""
     try:
+        # Validate that a key has been selected
+        if not key_id:
+            return Div("Please choose a key to bind to this action", cls=AlertT.warning)
+            
         # Add the binding
         db.t.bindings.insert(dict(
             game_id=game_id,
@@ -346,6 +410,10 @@ def post(id: int, key_id: int, modifier_id: int, description: str):
     current_binding = next(db.t.bindings.rows_where("id = ?", [id]))
     game_id = current_binding['game_id']
     
+    # Validate that a key has been selected
+    if not key_id:
+        return Div("Please choose a key to bind to this action", cls=AlertT.warning)
+    
     # Update the binding with both key and modifier
     binding = db.t.bindings.update(dict(
         id=id,
@@ -356,7 +424,7 @@ def post(id: int, key_id: int, modifier_id: int, description: str):
     
     # Get all bindings for the game and return updated table
     bindings = db.t.bindings.rows_where("game_id = ?", [game_id])
-    return create_bindings_table(bindings, game_id)
+    return create_bindings_table(db, game_id)
 
 @rt('/binding/{id}/delete')
 def delete(id: int):
@@ -377,7 +445,7 @@ def get(id: int):
     binding = next(db.t.bindings.rows_where("id = ?", [id]))
     game_id = binding['game_id']
     bindings = db.t.bindings.rows_where("game_id = ?", [game_id])
-    return create_bindingu_table(bindings, game_id)
+    return create_bindings_table(db, game_id)
 
 # setup_hf_backup(ap)
 
