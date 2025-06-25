@@ -25,7 +25,7 @@ def init_db(data_dir: Path = None):
     data_dir.mkdir(exist_ok=True)
     return database(data_dir / 'game_bindings.db')
 
-# %% ../nbs/00_create_db_structure.ipynb 7
+# %% ../nbs/00_create_db_structure.ipynb 10
 def create_tables(db: database, # Database connection
                   overwrite_existing: bool = False # Remove all existing data in database
                   ):
@@ -117,7 +117,7 @@ def create_tables(db: database, # Database connection
     )
 
 
-# %% ../nbs/00_create_db_structure.ipynb 14
+# %% ../nbs/00_create_db_structure.ipynb 17
 def add_clmn_to_table(db, table, column, col_type, **kwargs):
     """Add a new column to an existing table"""
     if column in db.t[table].c:
@@ -125,7 +125,7 @@ def add_clmn_to_table(db, table, column, col_type, **kwargs):
     else:
         return db.t[table].add_column(column, col_type, **kwargs)
 
-# %% ../nbs/00_create_db_structure.ipynb 19
+# %% ../nbs/00_create_db_structure.ipynb 22
 def drop_clmn_from_table(db, table, column):
     """Drop a column from an existing table"""
     if column not in db.t[table].c:

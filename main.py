@@ -192,6 +192,11 @@ def post(name: str, game_type: str, image_url: str = ""):
     except Exception as e:
         return Div(f"Error: {str(e)}", cls=AlertT.error)
 
+@rt('/edit_actions')
+def get():
+    """Show page for editing an action"""
+    return base_layout(create_actions_table(db))
+
 @rt('/add_action')
 def get():
     """Show page for adding a new action"""

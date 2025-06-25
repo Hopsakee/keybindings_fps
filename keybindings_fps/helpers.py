@@ -35,6 +35,7 @@ def nav():
     nav = NavBar(
         A("Add Game", href="/add_game"),
         A("Add new action", href="/add_action"),
+        A("Edit actions", href="/edit_actions"),
         A("Settings", href="/settings"),
         brand=A("Games", href="/")
         )

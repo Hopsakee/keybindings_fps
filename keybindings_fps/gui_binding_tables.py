@@ -4,7 +4,7 @@
 
 # %% auto 0
 __all__ = ['get_modifier_name', 'get_key_name', 'get_action_name', 'create_binding_table_category', 'create_bindings_table',
-           'create_bindings_table_print']
+           'create_bindings_table_print', 'create_actions_table']
 
 # %% ../nbs/04_gui_binding_tables.ipynb 3
 from fasthtml.common import *
@@ -156,3 +156,10 @@ def create_bindings_table_print(db, game_id):
         Card(tables[1]),
         Card(*tables[2:]),
         cols=3, cls='gap-12'))
+
+# %% ../nbs/04_gui_binding_tables.ipynb 10
+def create_actions_table(db):
+    """Create a table for all actions"""
+    headers = db.t.actions()[0].keys()
+    rows = db.t.actions()
+    return TableFromDicts(headers, rows, id="actions-table")
